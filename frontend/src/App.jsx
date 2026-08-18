@@ -1427,7 +1427,7 @@ const handleLogin = (e) => {
                 </p>
               </div>
 
-              <button className="primary-action">
+              <button className="primary-action" onClick={() => document.querySelector('.backend-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                 VIEW MAINTENANCE PLAN →
               </button>
             </div>
