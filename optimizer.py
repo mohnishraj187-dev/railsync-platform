@@ -35,6 +35,7 @@ def load_scenario(scenario_name="baseline"):
     data["maintenance_resources"] = read_csv("maintenance_resources.csv")
     data["condition_alerts"] = read_csv("condition_alerts.csv")
     data["active_disruptions"] = []
+    data["completed_jobs"] = set()
     scenarios_path = DATA / "scenarios.json"
     scenarios = json.loads(scenarios_path.read_text()) if scenarios_path.exists() else {}
     scenario = scenarios.get(scenario_name, scenarios.get("baseline", {}))

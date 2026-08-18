@@ -8,6 +8,8 @@ import os
 from optimizer import load_scenario, optimize as advanced_optimize
 
 ROOT = Path(__file__).parent
+COMPLETED_JOBS = set()
+RESOLVED_ALERTS = set()
 PRIORITY = {"Critical": 0, "High": 1, "Normal": 2}
 def d(x): return datetime.fromisoformat(x)
 def overlap(a, b, c, e): return a < e and c < b
@@ -42,6 +44,12 @@ def optimize(data):
     capacity=sum((d(w["end"])-d(w["start"])).seconds//60 for w in data["engineering_windows"])
     return {"input_conflicts":conflicts(data),"schedule":scheduled,"manual_review":manual,"metrics":{"scheduled_jobs":len(scheduled),"manual_review_jobs":len(manual),"window_utilisation":round(sum(x["duration_minutes"] for x in scheduled)/capacity*100)}}
 
+def apply_completion_state(scenario):
+    scenario["maintenance_requests"]=[j for j in scenario.get("maintenance_requests",[]) if j.get("id") not in COMPLETED_JOBS]
+    scenario["coach_maintenance_requests"]=[j for j in scenario.get("coach_maintenance_requests",[]) if j.get("request_id") not in COMPLETED_JOBS]
+    scenario["condition_alerts"]=[a for a in scenario.get("condition_alerts",[]) if a.get("alert_id") not in RESOLVED_ALERTS]
+    return scenario
+
 class API(SimpleHTTPRequestHandler):
     def reply(self,x,code=200):
         raw=json.dumps(x).encode(); self.send_response(code);self.send_header("Content-Type","application/json");self.send_header("Content-Length",len(raw));self.send_header("Access-Control-Allow-Origin", "*");self.send_header("Access-Control-Allow-Headers", "Content-Type");self.end_headers();self.wfile.write(raw)
@@ -56,13 +64,25 @@ class API(SimpleHTTPRequestHandler):
         if self.path=="/api/dataset": return self.reply(json.loads((ROOT/"dataset.json").read_text()))
         return super().do_GET()
     def do_POST(self):
+        if self.path == "/api/complete":
+            try:
+                incoming=json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                job_id=incoming.get("job_id")
+                if not job_id: return self.reply({"error":"job_id is required"},400)
+                COMPLETED_JOBS.add(job_id)
+                alert_map={"CMR001":"ALERT001", "CMR003":"ALERT002", "ALERT001":"ALERT001", "ALERT002":"ALERT002"}
+                if job_id in alert_map: RESOLVED_ALERTS.add(alert_map[job_id])
+                result=advanced_optimize(apply_completion_state(load_scenario()))
+                result["completion"]={"job_id":job_id,"status":"completed","resolved_alert_id":alert_map.get(job_id)}
+                return self.reply(result)
+            except Exception as e: return self.reply({"error":str(e)},400)
         if self.path!="/api/optimize": return self.reply({"error":"Not found"},404)
         try:
             incoming=json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             scenario=load_scenario(incoming.get("scenario_name", "baseline"))
             for key in ("maintenance_requests", "engineering_windows", "train_operations", "active_disruptions", "coach_maintenance_requests", "condition_alerts"):
                 if key in incoming: scenario[key]=incoming[key]
-            return self.reply(advanced_optimize(scenario))
+            return self.reply(advanced_optimize(apply_completion_state(scenario)))
         except Exception as e: return self.reply({"error":str(e)},400)
 if __name__=="__main__":
     port=int(os.environ.get("PORT", "8000"))

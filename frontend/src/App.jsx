@@ -20,6 +20,18 @@ const [scenario, setScenario] = useState(null)
   const [planOpen, setPlanOpen] = useState(false)
   const [workCompleted, setWorkCompleted] = useState(false)
 
+  const completeJob = async (jobId) => {
+    try {
+      const base = import.meta.env.VITE_API_BASE || 'https://railsync-platform.onrender.com'
+      const response = await fetch(`${base}/api/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: jobId }) })
+      if (!response.ok) throw new Error(`Completion API returned ${response.status}`)
+      setBackendResult(await response.json())
+      setWorkCompleted(true)
+    } catch (apiError) {
+      setBackendError(`${apiError.message}. Completion was not recorded.`)
+    }
+  }
+
   const runBackend = async (scenarioName = 'baseline') => {
     setBackendLoading(true)
     setBackendError('')
@@ -317,7 +329,7 @@ const handleLogin = (e) => {
         </div>
       </div>}
       <div className="backend-job-list">
-        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => { setPlanOpen(true); setWorkCompleted(false) }}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
+        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => completeJob(decision.job_id)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
       </div>
     </>
   )}
