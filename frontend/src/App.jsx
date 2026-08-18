@@ -332,11 +332,18 @@ const handleLogin = (e) => {
           <p>{workCompleted ? 'The backend cleared the completed job and recalculated the active alerts, risk score and schedule.' : (selectedDecision?.reason || 'Select a scheduled job or manual-review item to see its plan.')}</p>
           {!workCompleted && selectedDecision && <>
             <p><strong>Decision:</strong> {selectedDecision.status === 'manual_review' ? 'Manual review required' : 'Safe to schedule'} · <strong>Priority:</strong> {selectedDecision.priority || '—'} · <strong>Predicted time:</strong> {selectedDecision.predicted_duration_minutes || '—'} min</p>
+            <p><strong>Track protection:</strong> {selectedDecision.track || 'Rake/facility'} — {selectedDecision.priority === 'Critical' ? 'block the affected track during the job; trains must be rerouted or held if no safe path exists.' : 'reserve the engineering window and protect it from conflicting movements.'}</p>
             <p><strong>Checks:</strong> {(selectedDecision.checks || []).join(' · ') || 'No additional checks reported.'}</p>
             <p><strong>Next steps:</strong> verify the asset, perform the scheduled job, attach inspection evidence, then confirm completion.</p>
           </>}
           {!workCompleted && selectedDecision && <button className="asset-analysis-button" onClick={() => completeJob(selectedDecision.job_id)}>✓ MARK WORK COMPLETE</button>}
           {workCompleted && <span className="maintenance-required">✓ COMPLETED BY CONTROLLER</span>}
+        </div>
+      </div>}
+      {(backendResult.train_plan || []).some(t => t.status !== 'on_plan') && <div className="ai-explanation">
+        <div className="explanation-icon">🚦</div>
+        <div><p className="eyebrow">TRAFFIC SAFETY RESPONSE</p><h3>Track block and train movement decision</h3>
+          {(backendResult.train_plan || []).filter(t => t.status !== 'on_plan').map(t => <p key={t.id}><strong>{t.service}</strong>: {t.status === 'rerouted' ? `REROUTED ${t.original_track} → ${t.track}` : 'HELD / MANUAL REVIEW'} — {t.reason}</p>)}
         </div>
       </div>}
       <div className="backend-job-list">

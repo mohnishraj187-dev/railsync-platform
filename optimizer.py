@@ -270,7 +270,7 @@ def optimize(data):
             reason_text = job.get("reason", "Manual review required.")
             checks += ["safe slot or eligible crew reassignment could not resolve it", "controller approval required"]
             reason = f"Rejected for automatic scheduling: {reason_text}"
-        decisions.append({"job_id": job.get("id", job.get("request_id")), "title": job.get("title", job.get("maintenance_type", "Rake maintenance")), "priority": priority, "status": "scheduled" if scheduled else "manual_review", "checks": checks, "reason": reason, "predicted_duration_minutes": job.get("predicted_duration_minutes", job.get("duration_minutes")), "start": job.get("start"), "end": job.get("end")})
+        decisions.append({"job_id": job.get("id", job.get("request_id")), "title": job.get("title", job.get("maintenance_type", "Rake maintenance")), "priority": priority, "status": "scheduled" if scheduled else "manual_review", "checks": checks, "reason": reason, "predicted_duration_minutes": job.get("predicted_duration_minutes", job.get("duration_minutes")), "start": job.get("start"), "end": job.get("end"), "track": job.get("track"), "risk_if_delayed": job.get("risk_if_delayed")})
     severity_score = {"Critical": 94, "High": 78, "Normal": 45}
     active_alerts = [a for a in data["condition_alerts"] if a.get("alert_status") == "active"]
     top_alert = max(active_alerts, key=lambda a: severity_score.get(a.get("severity"), 30), default=None)
