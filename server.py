@@ -44,7 +44,7 @@ def optimize(data):
 
 class API(SimpleHTTPRequestHandler):
     def reply(self,x,code=200):
-        raw=json.dumps(x).encode(); self.send_response(code);self.send_header("Content-Type","application/json");self.send_header("Content-Length",len(raw));self.end_headers();self.wfile.write(raw)
+        raw=json.dumps(x).encode(); self.send_response(code);self.send_header("Content-Type","application/json");self.send_header("Content-Length",len(raw));self.send_header("Access-Control-Allow-Origin", "*");self.send_header("Access-Control-Allow-Headers", "Content-Type");self.end_headers();self.wfile.write(raw)
     def do_OPTIONS(self):
         self.send_response(204); self.send_header("Access-Control-Allow-Origin", "*"); self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS"); self.send_header("Access-Control-Allow-Headers", "Content-Type"); self.end_headers()
     def do_GET(self):
