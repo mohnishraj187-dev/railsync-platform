@@ -1,0 +1,4 @@
+rake_id,service,formation,location,arrival,scheduled_departure,turnaround_minutes,status
+R204,Passenger 204,LHB-22,ST-C,2026-08-20T13:45:00,2026-08-20T17:00:00,195,arrived
+R318,Intercity 318,LHB-16,ST-B,2026-08-20T12:00:00,2026-08-20T13:10:00,70,arrived
+R072,Freight 72,BOXN,ST-C,2026-08-20T15:20:00,2026-08-20T16:00:00,40,planned

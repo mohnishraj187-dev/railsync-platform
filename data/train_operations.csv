@@ -1,0 +1,6 @@
+id,track,service,start,end,status,direction
+T101,Track-A,Express 101,2026-08-20T08:30:00,2026-08-20T09:15:00,running,outbound
+T102,Track-A,Passenger 204,2026-08-20T11:45:00,2026-08-20T12:15:00,running,outbound
+T201,Track-B,Intercity 318,2026-08-20T12:00:00,2026-08-20T12:40:00,running,outbound
+T202,Track-B,Freight 72,2026-08-20T14:50:00,2026-08-20T15:20:00,running,outbound
+T301,Track-C,Passenger 509,2026-08-20T14:00:00,2026-08-20T14:40:00,running,outbound

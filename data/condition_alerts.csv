@@ -1,0 +1,3 @@
+alert_id,rake_id,asset,detected_at,severity,due_by,alert_status,recommended_action
+ALERT001,R204,wheelset W204-3,2026-08-20T13:35:00,Critical,2026-08-20T16:30:00,active,Wheel-impact inspection before departure
+ALERT002,R318,brake rigging B318-2,2026-08-20T11:45:00,High,2026-08-20T13:00:00,active,Brake-power examination

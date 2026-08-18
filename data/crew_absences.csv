@@ -1,0 +1,4 @@
+absence_id,crew_id,absence_type,start,end,approved,replacement_required
+ABS001,LP003,medical_restriction,2026-08-20T06:00:00,2026-08-20T18:00:00,yes,yes
+ABS002,TRK002,planned_leave,2026-08-20T12:00:00,2026-08-20T22:00:00,yes,yes
+ABS003,GD003,training,2026-08-20T07:00:00,2026-08-20T19:00:00,yes,yes

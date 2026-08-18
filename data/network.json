@@ -1,0 +1,62 @@
+{
+  "stations": [
+    {
+      "id": "ST-A",
+      "name": "Alpha Junction",
+      "x": 70,
+      "y": 155
+    },
+    {
+      "id": "ST-B",
+      "name": "Bravo Yard",
+      "x": 285,
+      "y": 60
+    },
+    {
+      "id": "ST-C",
+      "name": "Charlie Terminal",
+      "x": 500,
+      "y": 155
+    },
+    {
+      "id": "ST-D",
+      "name": "Delta Depot",
+      "x": 285,
+      "y": 250
+    }
+  ],
+  "segments": [
+    {
+      "track": "Track-A",
+      "from": "ST-A",
+      "to": "ST-B"
+    },
+    {
+      "track": "Track-B",
+      "from": "ST-B",
+      "to": "ST-C"
+    },
+    {
+      "track": "Track-C",
+      "from": "ST-B",
+      "to": "ST-D"
+    }
+  ],
+  "reroute_options": {
+    "Track-B": [
+      "Track-C"
+    ]
+  },
+  "demo_disruption": {
+    "id": "DIS001",
+    "track": "Track-B",
+    "start": "2026-08-20T14:45:00",
+    "end": "2026-08-20T15:30:00",
+    "reason": "Simulated signal failure"
+  },
+  "safety": {
+    "default_headway_minutes": 10,
+    "junction_clearance_minutes": 5,
+    "notes": "POC safety envelope; replace with signalling/block-table values for deployment."
+  }
+}

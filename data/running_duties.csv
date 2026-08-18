@@ -1,0 +1,9 @@
+duty_id,service,track,start,end,required_role,required_qualification,assigned_crew_id,assignment_status,duty_location
+D001,Express 101,Track-A,2026-08-20T08:30:00,2026-08-20T09:15:00,loco_pilot,electric_loco,LP001,assigned,hq
+D002,Express 101,Track-A,2026-08-20T08:30:00,2026-08-20T09:15:00,guard,passenger,GD001,assigned,hq
+D003,Passenger 204,Track-A,2026-08-20T11:45:00,2026-08-20T12:15:00,loco_pilot,electric_loco,LP002,assigned,hq
+D004,Passenger 204,Track-A,2026-08-20T11:45:00,2026-08-20T12:15:00,guard,passenger,GD002,assigned,hq
+D005,Intercity 318,Track-B,2026-08-20T12:00:00,2026-08-20T12:40:00,loco_pilot,diesel_loco,LP003,uncovered_absence,hq
+D006,Intercity 318,Track-B,2026-08-20T12:00:00,2026-08-20T12:40:00,guard,passenger,GD003,uncovered_absence,hq
+D007,Freight 72,Track-B,2026-08-20T14:50:00,2026-08-20T15:20:00,loco_pilot,diesel_loco,,unassigned,hq
+D008,Freight 72,Track-B,2026-08-20T14:50:00,2026-08-20T15:20:00,guard,freight,,unassigned,hq

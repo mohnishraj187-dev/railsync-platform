@@ -1,0 +1,70 @@
+{
+  "baseline": {
+    "description": "Normal timetable with planned track and rake maintenance.",
+    "active_disruptions": []
+  },
+  "no_maintenance": {
+    "description": "No planned maintenance and no active condition alerts; timetable and crew planning still run.",
+    "maintenance_requests": [],
+    "coach_maintenance_requests": [],
+    "condition_alerts": [],
+    "active_disruptions": []
+  },
+  "planned_conflicts": {
+    "description": "Baseline scenario showing overlapping maintenance requests and train conflicts.",
+    "active_disruptions": []
+  },
+  "track_failure": {
+    "description": "Track-B signal failure triggers traffic-aware rerouting.",
+    "active_disruptions": [
+      "demo_disruption"
+    ]
+  },
+  "blocked_alternate": {
+    "description": "Track-B failure plus a halted consist on Track-C forces manual review.",
+    "active_disruptions": [
+      "demo_disruption"
+    ],
+    "train_operations_additions": [
+      {
+        "id": "T999",
+        "track": "Track-C",
+        "service": "Halted maintenance consist",
+        "start": "2026-08-20T14:45:00",
+        "end": "2026-08-20T15:30:00",
+        "status": "halted",
+        "direction": "inbound"
+      }
+    ]
+  },
+  "condition_alert": {
+    "description": "Active asset alert generates urgent rake inspection during turnaround.",
+    "active_disruptions": []
+  },
+  "back_to_back_critical": {
+    "description": "Two critical condition alerts arrive close together; the optimizer sequences safe work and sends impossible cases to manual review.",
+    "active_disruptions": [],
+    "condition_alerts": [
+      {
+        "alert_id": "ALERT101",
+        "rake_id": "R318",
+        "asset": "brake rigging R318-1",
+        "detected_at": "2026-08-20T12:05:00",
+        "severity": "Critical",
+        "due_by": "2026-08-20T13:00:00",
+        "alert_status": "active",
+        "recommended_action": "Emergency brake inspection"
+      },
+      {
+        "alert_id": "ALERT102",
+        "rake_id": "R072",
+        "asset": "brake rigging R072-1",
+        "detected_at": "2026-08-20T15:21:00",
+        "severity": "Critical",
+        "due_by": "2026-08-20T16:00:00",
+        "alert_status": "active",
+        "recommended_action": "Emergency freight-rake inspection"
+      }
+    ]
+  }
+}

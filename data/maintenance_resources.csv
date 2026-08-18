@@ -1,0 +1,4 @@
+resource_id,resource_type,location,available_start,available_end,status
+BAY-C1,pit_bay,ST-C,2026-08-20T13:30:00,2026-08-20T16:30:00,available
+BAY-C2,service_bay,ST-C,2026-08-20T13:30:00,2026-08-20T16:30:00,available
+BAY-B1,pit_bay,ST-B,2026-08-20T12:00:00,2026-08-20T13:00:00,available

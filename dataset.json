@@ -1,0 +1,136 @@
+{
+  "engineering_windows": [
+    {
+      "id": "W001",
+      "track": "Track-A",
+      "start": "2026-08-20T09:00:00",
+      "end": "2026-08-20T12:00:00"
+    },
+    {
+      "id": "W002",
+      "track": "Track-A",
+      "start": "2026-08-20T18:00:00",
+      "end": "2026-08-20T21:30:00"
+    },
+    {
+      "id": "W003",
+      "track": "Track-B",
+      "start": "2026-08-20T12:30:00",
+      "end": "2026-08-20T15:00:00"
+    },
+    {
+      "id": "W004",
+      "track": "Track-B",
+      "start": "2026-08-20T18:30:00",
+      "end": "2026-08-20T21:00:00"
+    },
+    {
+      "id": "W005",
+      "track": "Track-C",
+      "start": "2026-08-20T14:30:00",
+      "end": "2026-08-20T17:00:00"
+    }
+  ],
+  "train_operations": [
+    {
+      "id": "T102",
+      "track": "Track-A",
+      "service": "Passenger 204",
+      "start": "2026-08-20T11:45:00",
+      "end": "2026-08-20T12:15:00"
+    },
+    {
+      "id": "T202",
+      "track": "Track-B",
+      "service": "Freight 72",
+      "start": "2026-08-20T14:50:00",
+      "end": "2026-08-20T15:20:00"
+    }
+  ],
+  "maintenance_requests": [
+    {
+      "id": "M001",
+      "title": "Rail crack inspection",
+      "track": "Track-A",
+      "priority": "Critical",
+      "duration_minutes": 90,
+      "preferred_start": "2026-08-20T10:00:00",
+      "crew_type": "Inspection",
+      "reason": "Rail crack reported; immediate inspection is required before normal traffic is cleared.",
+      "risk_if_delayed": "Potential rail failure and derailment exposure if delayed.",
+      "priority_basis": "Critical safety defect",
+      "predicted_duration_minutes": 90,
+      "duration_confidence": "high"
+    },
+    {
+      "id": "M002",
+      "title": "Replace rail fasteners",
+      "track": "Track-A",
+      "priority": "High",
+      "duration_minutes": 120,
+      "preferred_start": "2026-08-20T10:30:00",
+      "crew_type": "Track",
+      "reason": "Fastener replacement requested after track inspection found degraded fixings.",
+      "risk_if_delayed": "Progressive track instability and speed restriction risk.",
+      "priority_basis": "High infrastructure risk",
+      "predicted_duration_minutes": 120,
+      "duration_confidence": "medium"
+    },
+    {
+      "id": "M003",
+      "title": "Signal cable inspection",
+      "track": "Track-B",
+      "priority": "High",
+      "duration_minutes": 60,
+      "preferred_start": "2026-08-20T13:00:00",
+      "crew_type": "Signal",
+      "reason": "Signal cable inspection requested after a signalling integrity concern.",
+      "risk_if_delayed": "Signal failure or unsafe movement authority.",
+      "priority_basis": "High signalling risk",
+      "predicted_duration_minutes": 60,
+      "duration_confidence": "medium"
+    },
+    {
+      "id": "M004",
+      "title": "Overhead wire inspection",
+      "track": "Track-B",
+      "priority": "Normal",
+      "duration_minutes": 90,
+      "preferred_start": "2026-08-20T13:30:00",
+      "crew_type": "Electrical",
+      "reason": "Planned overhead equipment inspection for electrical asset condition.",
+      "risk_if_delayed": "OHE fault, service interruption, or traction isolation.",
+      "priority_basis": "Planned asset risk",
+      "predicted_duration_minutes": 90,
+      "duration_confidence": "medium"
+    },
+    {
+      "id": "M005",
+      "title": "Geometry measurement",
+      "track": "Track-C",
+      "priority": "Normal",
+      "duration_minutes": 60,
+      "preferred_start": "2026-08-20T15:00:00",
+      "crew_type": "Inspection",
+      "reason": "Track geometry measurement to identify alignment and level defects.",
+      "risk_if_delayed": "Undetected geometry degradation and future speed restriction.",
+      "priority_basis": "Planned condition monitoring",
+      "predicted_duration_minutes": 60,
+      "duration_confidence": "medium"
+    },
+    {
+      "id": "M006",
+      "title": "Emergency turnout lubrication",
+      "track": "Track-A",
+      "priority": "Critical",
+      "duration_minutes": 60,
+      "preferred_start": "2026-08-20T19:15:00",
+      "crew_type": "Track",
+      "reason": "Emergency turnout lubrication to restore reliable point operation.",
+      "risk_if_delayed": "Turnout failure, route unavailability, or operational delay.",
+      "priority_basis": "Critical route availability",
+      "predicted_duration_minutes": 60,
+      "duration_confidence": "high"
+    }
+  ]
+}
