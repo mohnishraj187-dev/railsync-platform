@@ -317,7 +317,7 @@ const handleLogin = (e) => {
         </div>
       </div>}
       <div className="backend-job-list">
-        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small></p></div>)}
+        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => { setPlanOpen(true); setWorkCompleted(false) }}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
       </div>
     </>
   )}
