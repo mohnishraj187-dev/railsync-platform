@@ -17,6 +17,8 @@ const [scenario, setScenario] = useState(null)
   const [backendResult, setBackendResult] = useState(null)
   const [backendLoading, setBackendLoading] = useState(false)
   const [backendError, setBackendError] = useState('')
+  const [planOpen, setPlanOpen] = useState(false)
+  const [workCompleted, setWorkCompleted] = useState(false)
 
   const runBackend = async (scenarioName = 'baseline') => {
     setBackendLoading(true)
@@ -304,6 +306,16 @@ const handleLogin = (e) => {
           <p>{backendResult.train_plan?.filter(t => t.status !== 'on_plan').map(t => `${t.service}: ${t.reason}`).join(' · ') || 'No train disruption. Maintenance was placed around timetable occupancy, engineering windows and eligible crew.'}</p>
         </div>
       </div>
+      {planOpen && <div className="ai-explanation">
+        <div className="explanation-icon">🤖</div>
+        <div><p className="eyebrow">AI MAINTENANCE PLAN · CONTROLLER ACTION</p>
+          <h3>{workCompleted ? 'Work completed and acknowledged' : 'Recommended intervention sequence'}</h3>
+          <p>{workCompleted ? 'The controller confirmed completion. The alert should be cleared only after inspection evidence and supervisor approval.' : (backendResult.decision_trace?.[0]?.reason || 'The optimizer is waiting for a safe maintenance decision.')}</p>
+          <p><strong>Next steps:</strong> verify the asset, perform the scheduled job, attach inspection evidence, then confirm completion.</p>
+          {!workCompleted && <button className="asset-analysis-button" onClick={() => setWorkCompleted(true)}>✓ MARK WORK COMPLETE</button>}
+          {workCompleted && <span className="maintenance-required">✓ COMPLETED BY CONTROLLER</span>}
+        </div>
+      </div>}
       <div className="backend-job-list">
         {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small></p></div>)}
       </div>
@@ -1427,7 +1439,7 @@ const handleLogin = (e) => {
                 </p>
               </div>
 
-              <button className="primary-action" onClick={() => document.querySelector('.backend-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              <button className="primary-action" onClick={() => { setPlanOpen(true); setTimeout(() => document.querySelector('.backend-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }}>
                 VIEW MAINTENANCE PLAN →
               </button>
             </div>
