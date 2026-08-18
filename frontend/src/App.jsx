@@ -19,6 +19,13 @@ const [scenario, setScenario] = useState(null)
   const [backendError, setBackendError] = useState('')
   const [planOpen, setPlanOpen] = useState(false)
   const [workCompleted, setWorkCompleted] = useState(false)
+  const [selectedDecision, setSelectedDecision] = useState(null)
+
+  const openDecision = (decision) => {
+    setSelectedDecision(decision)
+    setPlanOpen(true)
+    setWorkCompleted(false)
+  }
 
   const completeJob = async (jobId) => {
     try {
@@ -321,15 +328,19 @@ const handleLogin = (e) => {
       {planOpen && <div className="ai-explanation">
         <div className="explanation-icon">🤖</div>
         <div><p className="eyebrow">AI MAINTENANCE PLAN · CONTROLLER ACTION</p>
-          <h3>{workCompleted ? 'Work completed and acknowledged' : 'Recommended intervention sequence'}</h3>
-          <p>{workCompleted ? 'The controller confirmed completion. The alert should be cleared only after inspection evidence and supervisor approval.' : (backendResult.decision_trace?.[0]?.reason || 'The optimizer is waiting for a safe maintenance decision.')}</p>
-          <p><strong>Next steps:</strong> verify the asset, perform the scheduled job, attach inspection evidence, then confirm completion.</p>
-          {!workCompleted && <button className="asset-analysis-button" onClick={() => setWorkCompleted(true)}>✓ MARK WORK COMPLETE</button>}
+          <h3>{workCompleted ? 'Work completed and acknowledged' : (selectedDecision?.title || 'Recommended intervention sequence')}</h3>
+          <p>{workCompleted ? 'The backend cleared the completed job and recalculated the active alerts, risk score and schedule.' : (selectedDecision?.reason || 'Select a scheduled job or manual-review item to see its plan.')}</p>
+          {!workCompleted && selectedDecision && <>
+            <p><strong>Decision:</strong> {selectedDecision.status === 'manual_review' ? 'Manual review required' : 'Safe to schedule'} · <strong>Priority:</strong> {selectedDecision.priority || '—'} · <strong>Predicted time:</strong> {selectedDecision.predicted_duration_minutes || '—'} min</p>
+            <p><strong>Checks:</strong> {(selectedDecision.checks || []).join(' · ') || 'No additional checks reported.'}</p>
+            <p><strong>Next steps:</strong> verify the asset, perform the scheduled job, attach inspection evidence, then confirm completion.</p>
+          </>}
+          {!workCompleted && selectedDecision && <button className="asset-analysis-button" onClick={() => completeJob(selectedDecision.job_id)}>✓ MARK WORK COMPLETE</button>}
           {workCompleted && <span className="maintenance-required">✓ COMPLETED BY CONTROLLER</span>}
         </div>
       </div>}
       <div className="backend-job-list">
-        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => completeJob(decision.job_id)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
+        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => openDecision(decision)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
       </div>
     </>
   )}
