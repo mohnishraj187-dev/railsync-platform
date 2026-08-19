@@ -1,7 +1,7 @@
-id,title,track,priority,duration_minutes,preferred_start,crew_type,equipment,status
-M001,Rail crack ultrasonic inspection,Track-A,Critical,90,2026-08-20T10:00:00,inspection,ultrasonic_trolley,requested
-M002,Replace worn rail fasteners,Track-A,High,120,2026-08-20T10:30:00,track,fastener_kit,requested
-M003,Signal cable inspection,Track-B,High,60,2026-08-20T13:00:00,signal,cable_tester,requested
-M004,Overhead wire inspection,Track-B,Normal,90,2026-08-20T13:30:00,electrical,boom_lift,requested
-M005,Track geometry measurement,Track-C,Normal,60,2026-08-20T15:00:00,inspection,geometry_car,requested
-M006,Emergency turnout lubrication,Track-A,Critical,60,2026-08-20T19:15:00,track,lubrication_kit,requested
+id,title,track,priority,duration_minutes,preferred_start,crew_type,equipment,status,safety_rank,safety_class,priority_basis
+M001,Rail crack ultrasonic inspection,Track-A,Critical,90,2026-08-20T10:00:00,inspection,ultrasonic_trolley,requested,3,Track and turnout safety defect,Suspected rail crack on an active route requires inspection before release.
+M002,Replace worn rail fasteners,Track-A,High,120,2026-08-20T10:30:00,track,fastener_kit,requested,6,Preventive infrastructure maintenance,Degraded fasteners are planned prevention work; escalate if a safety limit is exceeded.
+M003,Signal cable inspection,Track-B,High,60,2026-08-20T13:00:00,signal,cable_tester,requested,4,Signalling and power safety defect,Signalling integrity can affect movement authority and must be protected.
+M004,Overhead wire inspection,Track-B,Normal,90,2026-08-20T13:30:00,electrical,boom_lift,requested,6,Preventive infrastructure maintenance,Planned OHE condition inspection without an active traction safety event.
+M005,Track geometry measurement,Track-C,Normal,60,2026-08-20T15:00:00,inspection,geometry_car,requested,6,Preventive infrastructure maintenance,Planned geometry monitoring before a defect reaches an intervention threshold.
+M006,Emergency turnout lubrication,Track-A,Critical,60,2026-08-20T19:15:00,track,lubrication_kit,requested,3,Track and turnout safety defect,Turnout reliability affects route safety; protect and inspect before unsafe movement.

@@ -58,9 +58,11 @@
       "crew_type": "Inspection",
       "reason": "Rail crack reported; immediate inspection is required before normal traffic is cleared.",
       "risk_if_delayed": "Potential rail failure and derailment exposure if delayed.",
-      "priority_basis": "Critical safety defect",
+      "priority_basis": "Suspected rail crack on an active route requires inspection before release.",
       "predicted_duration_minutes": 90,
-      "duration_confidence": "high"
+      "duration_confidence": "high",
+      "safety_rank": 3,
+      "safety_class": "Track and turnout safety defect"
     },
     {
       "id": "M002",
@@ -72,9 +74,11 @@
       "crew_type": "Track",
       "reason": "Fastener replacement requested after track inspection found degraded fixings.",
       "risk_if_delayed": "Progressive track instability and speed restriction risk.",
-      "priority_basis": "High infrastructure risk",
+      "priority_basis": "Degraded fasteners are planned prevention work; escalate if a safety limit is exceeded.",
       "predicted_duration_minutes": 120,
-      "duration_confidence": "medium"
+      "duration_confidence": "medium",
+      "safety_rank": 6,
+      "safety_class": "Preventive infrastructure maintenance"
     },
     {
       "id": "M003",
@@ -86,9 +90,11 @@
       "crew_type": "Signal",
       "reason": "Signal cable inspection requested after a signalling integrity concern.",
       "risk_if_delayed": "Signal failure or unsafe movement authority.",
-      "priority_basis": "High signalling risk",
+      "priority_basis": "Signalling integrity can affect movement authority and must be protected.",
       "predicted_duration_minutes": 60,
-      "duration_confidence": "medium"
+      "duration_confidence": "medium",
+      "safety_rank": 4,
+      "safety_class": "Signalling and power safety defect"
     },
     {
       "id": "M004",
@@ -100,9 +106,11 @@
       "crew_type": "Electrical",
       "reason": "Planned overhead equipment inspection for electrical asset condition.",
       "risk_if_delayed": "OHE fault, service interruption, or traction isolation.",
-      "priority_basis": "Planned asset risk",
+      "priority_basis": "Planned OHE condition inspection without an active traction safety event.",
       "predicted_duration_minutes": 90,
-      "duration_confidence": "medium"
+      "duration_confidence": "medium",
+      "safety_rank": 6,
+      "safety_class": "Preventive infrastructure maintenance"
     },
     {
       "id": "M005",
@@ -114,9 +122,11 @@
       "crew_type": "Inspection",
       "reason": "Track geometry measurement to identify alignment and level defects.",
       "risk_if_delayed": "Undetected geometry degradation and future speed restriction.",
-      "priority_basis": "Planned condition monitoring",
+      "priority_basis": "Planned geometry monitoring before a defect reaches an intervention threshold.",
       "predicted_duration_minutes": 60,
-      "duration_confidence": "medium"
+      "duration_confidence": "medium",
+      "safety_rank": 6,
+      "safety_class": "Preventive infrastructure maintenance"
     },
     {
       "id": "M006",
@@ -128,9 +138,11 @@
       "crew_type": "Track",
       "reason": "Emergency turnout lubrication to restore reliable point operation.",
       "risk_if_delayed": "Turnout failure, route unavailability, or operational delay.",
-      "priority_basis": "Critical route availability",
+      "priority_basis": "Turnout reliability affects route safety; protect and inspect before unsafe movement.",
       "predicted_duration_minutes": 60,
-      "duration_confidence": "high"
+      "duration_confidence": "high",
+      "safety_rank": 3,
+      "safety_class": "Track and turnout safety defect"
     }
   ]
 }

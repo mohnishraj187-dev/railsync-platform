@@ -3,7 +3,21 @@ import './App.css'
 
 const clock = (value) => value ? value.slice(11, 16) : '—'
 const roleLabel = (role) => ({ loco_pilot: 'Loco Pilot', assistant_loco_pilot: 'Assistant Loco Pilot', guard: 'Guard' }[role] || role || 'Staff')
-const priorityRank = { Critical: 0, High: 1, Normal: 2 }
+const safetyHierarchy = {
+  1: 'Emergency safety event',
+  2: 'Train-running safety defect',
+  3: 'Track and turnout safety defect',
+  4: 'Signalling and power safety defect',
+  5: 'Critical operational disruption',
+  6: 'Preventive infrastructure maintenance',
+  7: 'Rake turnaround and service readiness',
+  8: 'Routine housekeeping'
+}
+const legacySafetyRank = { Critical: 3, High: 5, Normal: 6 }
+const jobSafetyRank = (job) => {
+  const rank = Number(job?.safety_rank)
+  return Number.isInteger(rank) && rank >= 1 && rank <= 8 ? rank : (legacySafetyRank[job?.priority] ?? 8)
+}
 const riskTrackPositions = {
   'Track-A': { left: '31%', top: '56%' },
   'Track-B': { left: '63%', top: '44%' },
@@ -11,12 +25,9 @@ const riskTrackPositions = {
 }
 
 const compareJobRisk = (left, right) => {
-  const alertRank = (job) => (job.source_status === 'condition_alert' || job.status === 'condition_alert' ? 0 : 1)
-  const priority = (job) => priorityRank[job.priority] ?? 3
   const time = (job) => job.start || job.earliest_start || job.preferred_start || '9999-12-31T23:59:59'
 
-  return alertRank(left) - alertRank(right)
-    || priority(left) - priority(right)
+  return jobSafetyRank(left) - jobSafetyRank(right)
     || time(left).localeCompare(time(right))
     || String(left.id || left.request_id || left.job_id || '').localeCompare(String(right.id || right.request_id || right.job_id || ''))
 }
@@ -44,11 +55,11 @@ const [scenario, setScenario] = useState(null)
   const primaryJob = activeJobs[0]
   const liveTrains = backendResult?.train_plan || backendScenario?.train_operations || []
   const activeAlertCount = backendResult?.risk_summary?.active_alerts ?? 0
-  const majorRiskJobs = (backendResult?.decision_trace || []).filter(job => job.priority === 'Critical' && job.track)
+  const majorRiskJobs = (backendResult?.decision_trace || []).filter(job => jobSafetyRank(job) <= 4 && job.track)
   const majorRiskTracks = new Set(majorRiskJobs.map(job => job.track))
   const majorRiskTrack = majorRiskJobs[0]?.track
   const liveEvents = [
-    primaryJob && { time: clock(primaryJob.start), warning: primaryJob.priority === 'Critical', text: `${primaryJob.id || primaryJob.request_id} scheduled: ${primaryJob.title || primaryJob.maintenance_type}` },
+    primaryJob && { time: clock(primaryJob.start), warning: jobSafetyRank(primaryJob) <= 4, text: `Rank ${jobSafetyRank(primaryJob)}: ${primaryJob.id || primaryJob.request_id} scheduled — ${primaryJob.title || primaryJob.maintenance_type}` },
     ...liveTrains.filter(train => train.status && train.status !== 'on_plan' && train.status !== 'running').map(train => ({ time: clock(train.start), warning: true, text: `${train.service} ${train.status === 'rerouted' ? `rerouted to ${train.track}` : 'held for controller review'}` })),
     { time: 'LIVE', warning: activeAlertCount > 0, text: activeAlertCount ? `${activeAlertCount} active condition alert${activeAlertCount === 1 ? '' : 's'} requiring attention` : 'No active condition alerts — operating plan stable' }
   ].filter(Boolean).slice(0, 3)
@@ -393,14 +404,24 @@ const handleLogin = (e) => {
           <p>{backendResult.train_plan?.filter(t => t.status !== 'on_plan').map(t => `${t.service}: ${t.reason}`).join(' · ') || 'No train disruption. Maintenance was placed around timetable occupancy, engineering windows and eligible crew.'}</p>
         </div>
       </div>
+      <section className="safety-hierarchy">
+        <div>
+          <p className="eyebrow">CONTROLLER SAFETY HIERARCHY</p>
+          <h3>Eight-level intervention order</h3>
+          <p>Rank 1 is handled first. The legacy Critical/High/Normal field remains visible for compatibility, but does not determine queue order.</p>
+        </div>
+        <ol>
+          {Object.entries(safetyHierarchy).map(([rank, label]) => <li key={rank} className={Number(rank) === jobSafetyRank(selectedDecision || primaryJob) ? 'current-rank' : ''}><b>{rank}</b><span>{label}</span></li>)}
+        </ol>
+      </section>
       {planOpen && <div className="ai-explanation">
         <div className="explanation-icon">🤖</div>
         <div><p className="eyebrow">AI MAINTENANCE PLAN · CONTROLLER ACTION</p>
           <h3>{workCompleted ? 'Work completed and acknowledged' : (selectedDecision?.title || 'Recommended intervention sequence')}</h3>
           <p>{workCompleted ? 'The backend cleared the completed job and recalculated the active alerts, risk score and schedule.' : (selectedDecision?.reason || 'Select a scheduled job or manual-review item to see its plan.')}</p>
           {!workCompleted && selectedDecision && <>
-            <p><strong>Decision:</strong> {selectedDecision.status === 'manual_review' ? 'Manual review required' : 'Safe to schedule'} · <strong>Priority:</strong> {selectedDecision.priority || '—'} · <strong>Predicted time:</strong> {selectedDecision.predicted_duration_minutes || '—'} min</p>
-            <p><strong>Track protection:</strong> {selectedDecision.track || 'Rake/facility'} — {selectedDecision.priority === 'Critical' ? 'block the affected track during the job; trains must be rerouted or held if no safe path exists.' : 'reserve the engineering window and protect it from conflicting movements.'}</p>
+            <p><strong>Decision:</strong> {selectedDecision.status === 'manual_review' ? 'Manual review required' : 'Safe to schedule'} · <strong>Hierarchy:</strong> Rank {jobSafetyRank(selectedDecision)} — {selectedDecision.safety_class || safetyHierarchy[jobSafetyRank(selectedDecision)]} · <strong>Predicted time:</strong> {selectedDecision.predicted_duration_minutes || '—'} min</p>
+            <p><strong>Legacy severity:</strong> {selectedDecision.priority || '—'} · <strong>Track protection:</strong> {selectedDecision.track || 'Rake/facility'} — {jobSafetyRank(selectedDecision) <= 4 ? 'block the affected track or rake release until the defect is safe; reroute or hold trains when needed.' : 'reserve the engineering window and protect it from conflicting movements.'}</p>
             <p><strong>Checks:</strong> {(selectedDecision.checks || []).join(' · ') || 'No additional checks reported.'}</p>
             <p><strong>Next steps:</strong> verify the asset, perform the scheduled job, attach inspection evidence, then confirm completion.</p>
           </>}
@@ -448,7 +469,7 @@ const handleLogin = (e) => {
         </div>
       </section>
       <div className="backend-job-list">
-        {[...(backendResult.decision_trace || [])].sort(compareJobRisk).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => openDecision(decision)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
+        {[...(backendResult.decision_trace || [])].sort(compareJobRisk).map(decision => <div className={`feed-item ${decision.status === 'manual_review' || jobSafetyRank(decision) <= 4 ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>RANK {jobSafetyRank(decision)} · {decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.safety_class || safetyHierarchy[jobSafetyRank(decision)]}<br/><small>{decision.reason} · {(decision.checks || []).join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => openDecision(decision)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
       </div>
     </>
   )}
@@ -1343,7 +1364,7 @@ const handleLogin = (e) => {
               <span>
   {reoptimized
     ? 'Conflict resolved automatically ✓'
-    : '1 critical priority'}
+    : (primaryJob ? `Rank ${jobSafetyRank(primaryJob)} — ${primaryJob.safety_class || safetyHierarchy[jobSafetyRank(primaryJob)]}` : 'No active intervention')}
 </span>
             </div>
 
@@ -1559,6 +1580,7 @@ const handleLogin = (e) => {
                 <div className="risk-details">
                   <p><span>Active alerts</span> <strong>{backendResult?.risk_summary?.active_alerts ?? 0}</strong></p>
                   <p><span>Optimization</span> <strong>{backendLoading ? 'RUNNING' : activeAlertCount ? 'ACTION NEEDED' : 'STABLE'}</strong></p>
+                  <p><span>Safety hierarchy</span> <strong>{backendResult?.risk_summary?.safety_rank ? `Rank ${backendResult.risk_summary.safety_rank} — ${backendResult.risk_summary.safety_class}` : 'No active safety issue'}</strong></p>
                   <p><span>Risk basis</span> <strong>{backendResult?.risk_summary?.basis || 'Backend'}</strong></p>
                 </div>
               </div>

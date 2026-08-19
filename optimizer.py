@@ -6,7 +6,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
-PRIORITY = {"Critical": 0, "High": 1, "Normal": 2}
+# Lower rank means the job is handled first. These classes deliberately rank
+# the credible failure consequence, rather than the asset name alone.
+SAFETY_HIERARCHY = {
+    1: "Emergency safety event",
+    2: "Train-running safety defect",
+    3: "Track and turnout safety defect",
+    4: "Signalling and power safety defect",
+    5: "Critical operational disruption",
+    6: "Preventive infrastructure maintenance",
+    7: "Rake turnaround and service readiness",
+    8: "Routine housekeeping",
+}
+LEGACY_PRIORITY_RANK = {"Critical": 3, "High": 5, "Normal": 6}
+RISK_BY_SAFETY_RANK = {1: 99, 2: 92, 3: 86, 4: 82, 5: 68, 6: 45, 7: 25, 8: 10}
 FATIGUE_COST = {"low": 0, "medium": 15, "high": 40}
 # Configurable POC profile based on Railway Servants (Hours of Work and Period of Rest) rules and Railway Board running-staff instructions. This is not an operational authorization.
 RUNNING_RULES = {"hq_rest_short_hours": 12, "hq_rest_long_hours": 16, "outstation_rest_short_hours": 6, "outstation_rest_long_hours": 8, "max_consecutive_nights": 6, "periodic_rest_target_hours": 120, "max_days_away_from_hq": 3}
@@ -14,6 +27,22 @@ MAINTENANCE_MIN_REST_HOURS = 6
 
 def at(value):
     return datetime.fromisoformat(value)
+
+def safety_rank(job):
+    """Return an explainable, fault-based rank while accepting legacy inputs."""
+    try:
+        rank = int(job.get("safety_rank", job.get("priority_rank")))
+        if rank in SAFETY_HIERARCHY:
+            return rank
+    except (TypeError, ValueError):
+        pass
+    return LEGACY_PRIORITY_RANK.get(job.get("priority"), 8)
+
+def safety_class(job):
+    return job.get("safety_class") or SAFETY_HIERARCHY[safety_rank(job)]
+
+def priority_key(job, time_field):
+    return (safety_rank(job), at(job[time_field]))
 
 def overlap(a, b, c, d):
     return a < d and c < b
@@ -177,7 +206,7 @@ def reroute_trains(trains, network, disruptions):
 
 def schedule_maintenance(requests, windows, trains, members, absences, assignments):
     scheduled, manual = [], []
-    for job in sorted(requests, key=lambda x: (PRIORITY.get(x["priority"], 3), at(x["preferred_start"]))):
+    for job in sorted(requests, key=lambda x: priority_key(x, "preferred_start")):
         duration, selected = timedelta(minutes=job["duration_minutes"]), None
         for window in sorted((w for w in windows if w["track"] == job["track"]), key=lambda x: at(x["start"])):
             start, stop = max(at(window["start"]), at(job["preferred_start"])), at(window["end"])
@@ -211,9 +240,9 @@ def schedule_rake_maintenance(requests, movements, resources, members, absences,
         rake = by_rake.get(alert["rake_id"])
         if not rake:
             continue
-        jobs.append({"request_id": alert["alert_id"], "rake_id": alert["rake_id"], "location": rake["location"], "maintenance_type": alert["recommended_action"], "priority": alert["severity"], "duration_minutes": "60", "earliest_start": rake["arrival"], "latest_end": alert["due_by"], "required_crew": "inspection", "required_resource": "pit_bay", "reason": alert.get("recommended_action", "Condition alert inspection"), "risk_if_delayed": "Asset may be released with an unresolved safety condition.", "predicted_duration_minutes": 60, "duration_confidence": "high", "status": "condition_alert", "source_status": "condition_alert"})
+        jobs.append({"request_id": alert["alert_id"], "rake_id": alert["rake_id"], "location": rake["location"], "maintenance_type": alert["recommended_action"], "priority": alert["severity"], "safety_rank": alert.get("safety_rank"), "safety_class": alert.get("safety_class"), "duration_minutes": "60", "earliest_start": rake["arrival"], "latest_end": alert["due_by"], "required_crew": "inspection", "required_resource": "pit_bay", "reason": alert.get("recommended_action", "Condition alert inspection"), "risk_if_delayed": "Asset may be released with an unresolved safety condition.", "predicted_duration_minutes": 60, "duration_confidence": "high", "status": "condition_alert", "source_status": "condition_alert"})
     scheduled, manual, used_resources = [], [], []
-    for job in sorted(jobs, key=lambda x: (PRIORITY.get(x["priority"], 3), at(x["earliest_start"]))):
+    for job in sorted(jobs, key=lambda x: priority_key(x, "earliest_start")):
         movement = by_rake.get(job["rake_id"])
         if not movement:
             manual.append({**job, "status": "manual_review", "reason": "Rake movement not found."})
@@ -259,18 +288,20 @@ def optimize(data):
     manual.extend(rake_manual)
     capacity = sum(int((at(w["end"]) - at(w["start"])).total_seconds() // 60) for w in data["engineering_windows"])
     decisions = []
-    # Active condition-alert work must lead the controller queue; remaining work
-    # follows the deterministic Critical → High → Normal priority order.
+    # The controller queue follows the fault-based safety hierarchy. Active
+    # alerts remain visible, but are not automatically ranked above a more
+    # severe verified failure on another asset.
     decision_jobs = [*schedule, *manual, *rake_schedule]
     decision_jobs.sort(key=lambda job: (
-        0 if job.get("source_status") == "condition_alert" or job.get("status") == "condition_alert" else 1,
-        PRIORITY.get(job.get("priority"), 3),
+        safety_rank(job),
         at(job["start"]) if job.get("start") else at(job.get("earliest_start", "9999-12-31T23:59:59")),
     ))
     for job in decision_jobs:
         scheduled = job.get("status") == "scheduled"
         priority = job.get("priority", "Normal")
-        checks = [f"{priority} priority"]
+        rank = safety_rank(job)
+        classification = safety_class(job)
+        checks = [f"Rank {rank}: {classification}", f"Legacy severity: {priority}"]
         if scheduled:
             checks += ["no train conflict", "eligible crew selected/reassigned", "engineering/resource window available"]
             reason = "Scheduled: all safety, crew, resource and time-window checks passed."
@@ -278,9 +309,9 @@ def optimize(data):
             reason_text = job.get("reason", "Manual review required.")
             checks += ["safe slot or eligible crew reassignment could not resolve it", "controller approval required"]
             reason = f"Rejected for automatic scheduling: {reason_text}"
-        decisions.append({"job_id": job.get("id", job.get("request_id")), "title": job.get("title", job.get("maintenance_type", "Rake maintenance")), "priority": priority, "status": "scheduled" if scheduled else "manual_review", "checks": checks, "reason": reason, "predicted_duration_minutes": job.get("predicted_duration_minutes", job.get("duration_minutes")), "start": job.get("start"), "end": job.get("end"), "track": job.get("track"), "risk_if_delayed": job.get("risk_if_delayed"), "source_status": job.get("source_status")})
-    severity_score = {"Critical": 94, "High": 78, "Normal": 45}
+        decisions.append({"job_id": job.get("id", job.get("request_id")), "title": job.get("title", job.get("maintenance_type", "Rake maintenance")), "priority": priority, "safety_rank": rank, "safety_class": classification, "status": "scheduled" if scheduled else "manual_review", "checks": checks, "reason": reason, "predicted_duration_minutes": job.get("predicted_duration_minutes", job.get("duration_minutes")), "start": job.get("start"), "end": job.get("end"), "track": job.get("track"), "risk_if_delayed": job.get("risk_if_delayed"), "source_status": job.get("source_status")})
     active_alerts = [a for a in data["condition_alerts"] if a.get("alert_status") == "active"]
-    top_alert = max(active_alerts, key=lambda a: severity_score.get(a.get("severity"), 30), default=None)
-    risk_summary = {"score": min(99, (severity_score.get(top_alert.get("severity"), 30) if top_alert else 18) + max(0, len(active_alerts)-1) * 2), "severity": top_alert.get("severity", "Normal") if top_alert else "Normal", "asset": top_alert.get("asset", "Network baseline") if top_alert else "Network baseline", "alert_id": top_alert.get("alert_id") if top_alert else None, "active_alerts": len(active_alerts), "basis": "Condition-alert severity and active asset count"}
+    top_alert = min(active_alerts, key=safety_rank, default=None)
+    top_rank = safety_rank(top_alert) if top_alert else 8
+    risk_summary = {"score": min(99, RISK_BY_SAFETY_RANK[top_rank] + max(0, len(active_alerts)-1) * 2) if top_alert else 18, "severity": top_alert.get("severity", "Normal") if top_alert else "Normal", "safety_rank": top_rank if top_alert else None, "safety_class": safety_class(top_alert) if top_alert else "No active safety issue", "asset": top_alert.get("asset", "Network baseline") if top_alert else "Network baseline", "alert_id": top_alert.get("alert_id") if top_alert else None, "active_alerts": len(active_alerts), "basis": "Fault-based safety rank and active-alert count"}
     return {"input_conflicts": conflicts, "schedule": schedule, "rake_schedule": rake_schedule, "manual_review": manual, "decision_trace": decisions, "risk_summary": risk_summary, "train_plan": train_plan, "crew_assignments": crew_assignments, "uncovered_duties": uncovered, "metrics": {"scheduled_jobs": len(schedule), "rake_jobs_scheduled": len(rake_schedule), "manual_review_jobs": len(manual), "window_utilisation": round(sum(j["duration_minutes"] for j in schedule) / capacity * 100), "crew_covered_duties": len(crew_assignments), "crew_uncovered_duties": len(uncovered), "rerouted_trains": sum(t["status"] == "rerouted" for t in train_plan), "condition_alerts_processed": len(data["condition_alerts"])}}
