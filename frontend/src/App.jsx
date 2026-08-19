@@ -1,6 +1,26 @@
 import { useState } from 'react'
 import './App.css'
 
+const clock = (value) => value ? value.slice(11, 16) : '—'
+const roleLabel = (role) => ({ loco_pilot: 'Loco Pilot', assistant_loco_pilot: 'Assistant Loco Pilot', guard: 'Guard' }[role] || role || 'Staff')
+const priorityRank = { Critical: 0, High: 1, Normal: 2 }
+const riskTrackPositions = {
+  'Track-A': { left: '31%', top: '56%' },
+  'Track-B': { left: '63%', top: '44%' },
+  'Track-C': { left: '54%', top: '76%' }
+}
+
+const compareJobRisk = (left, right) => {
+  const alertRank = (job) => (job.source_status === 'condition_alert' || job.status === 'condition_alert' ? 0 : 1)
+  const priority = (job) => priorityRank[job.priority] ?? 3
+  const time = (job) => job.start || job.earliest_start || job.preferred_start || '9999-12-31T23:59:59'
+
+  return alertRank(left) - alertRank(right)
+    || priority(left) - priority(right)
+    || time(left).localeCompare(time(right))
+    || String(left.id || left.request_id || left.job_id || '').localeCompare(String(right.id || right.request_id || right.job_id || ''))
+}
+
 function App() {
   const [employeeId, setEmployeeId] = useState('')
   const [password, setPassword] = useState('')
@@ -20,6 +40,18 @@ const [scenario, setScenario] = useState(null)
   const [planOpen, setPlanOpen] = useState(false)
   const [workCompleted, setWorkCompleted] = useState(false)
   const [selectedDecision, setSelectedDecision] = useState(null)
+  const activeJobs = [...(backendResult?.schedule || []), ...(backendResult?.rake_schedule || [])].sort(compareJobRisk)
+  const primaryJob = activeJobs[0]
+  const liveTrains = backendResult?.train_plan || backendScenario?.train_operations || []
+  const activeAlertCount = backendResult?.risk_summary?.active_alerts ?? 0
+  const majorRiskJobs = (backendResult?.decision_trace || []).filter(job => job.priority === 'Critical' && job.track)
+  const majorRiskTracks = new Set(majorRiskJobs.map(job => job.track))
+  const majorRiskTrack = majorRiskJobs[0]?.track
+  const liveEvents = [
+    primaryJob && { time: clock(primaryJob.start), warning: primaryJob.priority === 'Critical', text: `${primaryJob.id || primaryJob.request_id} scheduled: ${primaryJob.title || primaryJob.maintenance_type}` },
+    ...liveTrains.filter(train => train.status && train.status !== 'on_plan' && train.status !== 'running').map(train => ({ time: clock(train.start), warning: true, text: `${train.service} ${train.status === 'rerouted' ? `rerouted to ${train.track}` : 'held for controller review'}` })),
+    { time: 'LIVE', warning: activeAlertCount > 0, text: activeAlertCount ? `${activeAlertCount} active condition alert${activeAlertCount === 1 ? '' : 's'} requiring attention` : 'No active condition alerts — operating plan stable' }
+  ].filter(Boolean).slice(0, 3)
 
   const openDecision = (decision) => {
     setSelectedDecision(decision)
@@ -30,12 +62,40 @@ const [scenario, setScenario] = useState(null)
   const completeJob = async (jobId) => {
     try {
       const base = import.meta.env.VITE_API_BASE || 'https://railsync-platform.onrender.com'
-      const response = await fetch(`${base}/api/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: jobId }) })
-      if (!response.ok) throw new Error(`Completion API returned ${response.status}`)
-      setBackendResult(await response.json())
-      setWorkCompleted(true)
+      const response = await fetch(base + '/api/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: jobId, scenario_name: backendScenario?.scenario_name || 'baseline' }) })
+      if (!response.ok) throw new Error('Completion API returned ' + response.status)
+      const optimizedResult = await response.json()
+      const nextDecision = [...(optimizedResult.decision_trace || [])].sort(compareJobRisk)[0] || null
+      setBackendResult(optimizedResult)
+      setSelectedDecision(nextDecision)
+      setPlanOpen(Boolean(nextDecision))
+      setWorkCompleted(false)
     } catch (apiError) {
       setBackendError(`${apiError.message}. Completion was not recorded.`)
+    }
+  }
+
+  const resetDemo = async () => {
+    setEmergency(false)
+    setReoptimized(false)
+    setAnalyzing(false)
+    setAssetAnalyzed(false)
+    setAnalyzingAsset(false)
+    setScenario(null)
+    setSelectedDecision(null)
+    setPlanOpen(false)
+    setBackendError('')
+    const configuredBase = import.meta.env.VITE_API_BASE
+    const apiBases = configuredBase ? [configuredBase] : ['http://localhost:8000', 'http://localhost:8010']
+    for (const apiBase of apiBases) {
+      try {
+        const response = await fetch(apiBase + '/api/reset', { method: 'POST' })
+        if (!response.ok) throw new Error('Reset API returned ' + response.status)
+        await runBackend('baseline')
+        return
+      } catch (apiError) {
+        setBackendError(apiError.message + '. The original dataset could not be restored.')
+      }
     }
   }
 
@@ -56,8 +116,14 @@ const [scenario, setScenario] = useState(null)
           body: JSON.stringify({ scenario_name: scenarioName })
         })
         if (!resultResponse.ok) throw new Error(`Optimizer API returned ${resultResponse.status}`)
+        const optimizedResult = await resultResponse.json()
+        const recommendedDecision = [...(optimizedResult.decision_trace || [])].sort(compareJobRisk)[0] || null
         setBackendScenario(loadedScenario)
-        setBackendResult(await resultResponse.json())
+        setBackendResult(optimizedResult)
+        setSelectedDecision(recommendedDecision)
+        setPlanOpen(Boolean(recommendedDecision))
+        setWorkCompleted(false)
+        setBackendLoading(false)
         return
       } catch (apiError) {
         lastError = apiError
@@ -281,8 +347,10 @@ const handleLogin = (e) => {
         setAssetAnalyzed(false)
         setAnalyzingAsset(false)
         setScenario(null)
-        setBackendResult(null)
+        setSelectedDecision(null)
+        setPlanOpen(false)
         setBackendError('')
+        resetDemo()
       }}
     >
       ↻ RESET DEMO
@@ -346,8 +414,41 @@ const handleLogin = (e) => {
           {(backendResult.train_plan || []).filter(t => t.status !== 'on_plan').map(t => <p key={t.id}><strong>{t.service}</strong>: {t.status === 'rerouted' ? `REROUTED ${t.original_track} → ${t.track}` : 'HELD / MANUAL REVIEW'} — {t.reason}</p>)}
         </div>
       </div>}
+      <section className="operations-detail-grid">
+        <div className="operations-table-card">
+          <div className="operations-table-heading">
+            <div><p className="eyebrow">LIVE TIMETABLE</p><h3>Traffic plan and recovery status</h3></div>
+            <span className="table-summary">{backendResult.train_plan?.length || 0} movements</span>
+          </div>
+          <div className="table-scroll"><table className="operations-table">
+            <thead><tr><th>Service</th><th>Time</th><th>Route</th><th>Movement decision</th></tr></thead>
+            <tbody>{(backendResult.train_plan || []).map(train => <tr key={train.id}>
+              <td><strong>{train.service}</strong><small>{train.id}</small></td><td>{clock(train.start)}–{clock(train.end)}</td>
+              <td>{train.status === 'rerouted' ? <>{train.original_track} <span className="route-arrow">→</span> {train.track}</> : train.track}</td>
+              <td><span className={`plan-status ${train.status}`}>{train.status === 'on_plan' ? 'ON TIME' : train.status === 'rerouted' ? 'REROUTED' : 'HOLD / REVIEW'}</span><small>{train.reason || train.traffic_checks?.[0]}</small></td>
+            </tr>)}</tbody>
+          </table></div>
+        </div>
+        <div className="operations-table-card">
+          <div className="operations-table-heading">
+            <div><p className="eyebrow">RUNNING-STAFF ROSTER</p><h3>Loco-pilot, guard and duty allocation</h3></div>
+            <span className="table-summary">Safety-rule checked</span>
+          </div>
+          <div className="table-scroll"><table className="operations-table">
+            <thead><tr><th>Duty / service</th><th>Role</th><th>Time</th><th>Assigned staff</th></tr></thead>
+            <tbody>{(backendScenario?.running_duties || []).map(duty => {
+              const assignment = (backendResult.crew_assignments || []).find(item => item.duty_id === duty.duty_id)
+              const uncovered = (backendResult.uncovered_duties || []).find(item => item.duty_id === duty.duty_id)
+              return <tr key={duty.duty_id} className={uncovered ? 'uncovered-row' : ''}>
+                <td><strong>{duty.duty_id}</strong><small>{duty.service} · {duty.track}</small></td><td>{roleLabel(duty.required_role)}</td><td>{clock(duty.start)}–{clock(duty.end)}</td>
+                <td>{assignment ? <><span className="plan-status assigned">{assignment.crew_id}</span><small>Eligible and rostered</small></> : <><span className="plan-status manual_review">UNASSIGNED</span><small>{uncovered?.checks?.[0] || 'Controller assignment required'}</small></>}</td>
+              </tr>
+            })}</tbody>
+          </table></div>
+        </div>
+      </section>
       <div className="backend-job-list">
-        {(backendResult.decision_trace || []).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => openDecision(decision)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
+        {[...(backendResult.decision_trace || [])].sort(compareJobRisk).map(decision => <div className={`feed-item ${decision.status === 'manual_review' ? 'warning' : ''}`} key={decision.job_id}><span className="feed-time">{decision.start?.slice(11, 16) || 'REVIEW'}</span><p><strong>{decision.job_id} · {decision.status === 'scheduled' ? 'SCHEDULED' : 'MANUAL REVIEW'}</strong> — {decision.reason}<br/><small>{decision.checks.join(' · ')} · predicted {decision.predicted_duration_minutes} min</small><br/><button className="asset-analysis-button" onClick={() => openDecision(decision)}>{decision.status === 'manual_review' ? 'OPEN MANUAL REVIEW' : 'OPEN AI PLAN'}</button></p></div>)}
       </div>
     </>
   )}
@@ -1359,12 +1460,10 @@ const handleLogin = (e) => {
 
   <div className="rail-line rail-a-b"></div>
   <div className="rail-line rail-b-c"></div>
-  <div className="rail-line rail-a-c"></div>
-  <div className="rail-line rail-c-d"></div>
-  <div className="rail-line rail-d-risk"></div>
-  <div className="rail-line rail-risk-e danger-track"></div>
+  <div className={`rail-line rail-a-c ${majorRiskTracks.has('Track-A') ? 'danger-track' : ''}`}></div>
+  <div className={`rail-line rail-c-d ${majorRiskTracks.has('Track-B') ? 'danger-track' : ''}`}></div>
   <div className="rail-line rail-c-f"></div>
-  <div className="rail-line rail-f-g"></div>
+  <div className={`rail-line rail-f-g ${majorRiskTracks.has('Track-C') ? 'danger-track' : ''}`}></div>
   <div className="rail-line rail-e-g"></div>
 
   <span className="signal signal-1"></span>
@@ -1410,23 +1509,25 @@ const handleLogin = (e) => {
 
   <div className="train train-1">
     <span>🚆</span>
-    <strong>T101</strong>
+    <strong>{liveTrains[0]?.id || '—'}</strong>
   </div>
 
   <div className="train train-2">
     <span>🚆</span>
-    <strong>T204</strong>
+    <strong>{liveTrains[1]?.id || '—'}</strong>
   </div>
 
   <div className="train train-3">
     <span>🚆</span>
-    <strong>T305</strong>
+    <strong>{liveTrains[2]?.id || '—'}</strong>
   </div>
 
-  <div className="risk-node">
-    <b>⚠</b>
-    <span>T-07</span>
-  </div>
+  {majorRiskTrack && (
+    <div className="risk-node" style={riskTrackPositions[majorRiskTrack]}>
+      <b>!</b>
+      <span>{majorRiskTrack}</span>
+    </div>
+  )}
 
 </div>
 
@@ -1457,7 +1558,7 @@ const handleLogin = (e) => {
 
                 <div className="risk-details">
                   <p><span>Active alerts</span> <strong>{backendResult?.risk_summary?.active_alerts ?? 0}</strong></p>
-                  <p><span>Vibration</span> <strong>HIGH</strong></p>
+                  <p><span>Optimization</span> <strong>{backendLoading ? 'RUNNING' : activeAlertCount ? 'ACTION NEEDED' : 'STABLE'}</strong></p>
                   <p><span>Risk basis</span> <strong>{backendResult?.risk_summary?.basis || 'Backend'}</strong></p>
                 </div>
               </div>
@@ -1478,48 +1579,22 @@ const handleLogin = (e) => {
           <section className="bottom-grid">
             <div className="command-card">
               <p className="eyebrow">CURRENT MAINTENANCE</p>
-              <h3>Job M14 — Critical Track Repair</h3>
+              <h3>{primaryJob ? `${primaryJob.id || primaryJob.request_id} — ${primaryJob.title || primaryJob.maintenance_type}` : 'No active maintenance work'}</h3>
 
               <div className="job-info">
-                <p>🛤 Track: <strong>T-07</strong></p>
-                <p>
-  🚜 Machine:{' '}
-  <strong className={reoptimized ? 'updated-value' : ''}>
-    {reoptimized ? 'M-05 ✓' : 'M-02'}
-  </strong>
-</p>
-                <p>
-  👷 Crew:{' '}
-  <strong className={reoptimized ? 'updated-value' : ''}>
-    {reoptimized ? 'C-03 ✓' : 'C-02'}
-  </strong>
-</p>
-                <p>
-  ⏱ Schedule:{' '}
-  <strong className={reoptimized ? 'updated-value' : ''}>
-    {reoptimized ? '14:40 – 15:15 ✓' : '14:30 – 15:10'}
-  </strong>
-</p>
+                <p>🛤 Track / location: <strong>{primaryJob?.track || primaryJob?.location || '—'}</strong></p>
+                <p>🔧 Work type: <strong>{primaryJob?.title || primaryJob?.maintenance_type || 'No work pending'}</strong></p>
+                <p>👷 Assigned staff: <strong>{primaryJob?.assigned_crew_id || '—'}</strong></p>
+                <p>⏱ Schedule: <strong>{primaryJob ? `${clock(primaryJob.start)} – ${clock(primaryJob.end)}` : '—'}</strong></p>
               </div>
             </div>
 
             <div className="command-card system-feed">
               <p className="eyebrow">LIVE SYSTEM FEED</p>
 
-              <div className="feed-item">
-                <span className="feed-time">14:02</span>
-                <p>Train T101 entered Track T-01</p>
-              </div>
-
-              <div className="feed-item">
-                <span className="feed-time">14:08</span>
-                <p>AI detected abnormal wear on T-07</p>
-              </div>
-
-              <div className="feed-item warning">
-                <span className="feed-time">14:12</span>
-                <p>Maintenance Job M14 prioritized</p>
-              </div>
+              {liveEvents.map((event, index) => <div className={`feed-item ${event.warning ? 'warning' : ''}`} key={`${event.time}-${index}`}>
+                <span className="feed-time">{event.time}</span><p>{event.text}</p>
+              </div>)}
             </div>
           </section>
         </main>

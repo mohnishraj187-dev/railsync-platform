@@ -211,7 +211,7 @@ def schedule_rake_maintenance(requests, movements, resources, members, absences,
         rake = by_rake.get(alert["rake_id"])
         if not rake:
             continue
-        jobs.append({"request_id": alert["alert_id"], "rake_id": alert["rake_id"], "location": rake["location"], "maintenance_type": alert["recommended_action"], "priority": alert["severity"], "duration_minutes": "60", "earliest_start": rake["arrival"], "latest_end": alert["due_by"], "required_crew": "inspection", "required_resource": "pit_bay", "reason": alert.get("recommended_action", "Condition alert inspection"), "risk_if_delayed": "Asset may be released with an unresolved safety condition.", "predicted_duration_minutes": 60, "duration_confidence": "high", "status": "condition_alert"})
+        jobs.append({"request_id": alert["alert_id"], "rake_id": alert["rake_id"], "location": rake["location"], "maintenance_type": alert["recommended_action"], "priority": alert["severity"], "duration_minutes": "60", "earliest_start": rake["arrival"], "latest_end": alert["due_by"], "required_crew": "inspection", "required_resource": "pit_bay", "reason": alert.get("recommended_action", "Condition alert inspection"), "risk_if_delayed": "Asset may be released with an unresolved safety condition.", "predicted_duration_minutes": 60, "duration_confidence": "high", "status": "condition_alert", "source_status": "condition_alert"})
     scheduled, manual, used_resources = [], [], []
     for job in sorted(jobs, key=lambda x: (PRIORITY.get(x["priority"], 3), at(x["earliest_start"]))):
         movement = by_rake.get(job["rake_id"])
@@ -236,7 +236,7 @@ def schedule_rake_maintenance(requests, movements, resources, members, absences,
             start, end, resource, crew = selected
             assignments.append({"duty_id": job["request_id"], "service": job["maintenance_type"], "role": job["required_crew"], "crew_id": crew["crew_id"], "start": start.isoformat(), "end": end.isoformat()})
             used_resources.append({"resource_id": resource["resource_id"], "start": start.isoformat(), "end": end.isoformat()})
-            scheduled.append({**job, "start": start.isoformat(), "end": end.isoformat(), "resource_id": resource["resource_id"], "assigned_crew_id": crew["crew_id"], "status": "scheduled"})
+            scheduled.append({**job, "start": start.isoformat(), "end": end.isoformat(), "resource_id": resource["resource_id"], "assigned_crew_id": crew["crew_id"], "source_status": job.get("status"), "status": "scheduled"})
         else:
             manual.append({**job, "status": "manual_review", "reason": "No bay, crew and turnaround slot before rake departure."})
     return scheduled, manual
@@ -259,7 +259,15 @@ def optimize(data):
     manual.extend(rake_manual)
     capacity = sum(int((at(w["end"]) - at(w["start"])).total_seconds() // 60) for w in data["engineering_windows"])
     decisions = []
-    for job in [*schedule, *manual, *rake_schedule]:
+    # Active condition-alert work must lead the controller queue; remaining work
+    # follows the deterministic Critical → High → Normal priority order.
+    decision_jobs = [*schedule, *manual, *rake_schedule]
+    decision_jobs.sort(key=lambda job: (
+        0 if job.get("source_status") == "condition_alert" or job.get("status") == "condition_alert" else 1,
+        PRIORITY.get(job.get("priority"), 3),
+        at(job["start"]) if job.get("start") else at(job.get("earliest_start", "9999-12-31T23:59:59")),
+    ))
+    for job in decision_jobs:
         scheduled = job.get("status") == "scheduled"
         priority = job.get("priority", "Normal")
         checks = [f"{priority} priority"]
@@ -270,7 +278,7 @@ def optimize(data):
             reason_text = job.get("reason", "Manual review required.")
             checks += ["safe slot or eligible crew reassignment could not resolve it", "controller approval required"]
             reason = f"Rejected for automatic scheduling: {reason_text}"
-        decisions.append({"job_id": job.get("id", job.get("request_id")), "title": job.get("title", job.get("maintenance_type", "Rake maintenance")), "priority": priority, "status": "scheduled" if scheduled else "manual_review", "checks": checks, "reason": reason, "predicted_duration_minutes": job.get("predicted_duration_minutes", job.get("duration_minutes")), "start": job.get("start"), "end": job.get("end"), "track": job.get("track"), "risk_if_delayed": job.get("risk_if_delayed")})
+        decisions.append({"job_id": job.get("id", job.get("request_id")), "title": job.get("title", job.get("maintenance_type", "Rake maintenance")), "priority": priority, "status": "scheduled" if scheduled else "manual_review", "checks": checks, "reason": reason, "predicted_duration_minutes": job.get("predicted_duration_minutes", job.get("duration_minutes")), "start": job.get("start"), "end": job.get("end"), "track": job.get("track"), "risk_if_delayed": job.get("risk_if_delayed"), "source_status": job.get("source_status")})
     severity_score = {"Critical": 94, "High": 78, "Normal": 45}
     active_alerts = [a for a in data["condition_alerts"] if a.get("alert_status") == "active"]
     top_alert = max(active_alerts, key=lambda a: severity_score.get(a.get("severity"), 30), default=None)

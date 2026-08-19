@@ -64,16 +64,23 @@ class API(SimpleHTTPRequestHandler):
         if self.path=="/api/dataset": return self.reply(json.loads((ROOT/"dataset.json").read_text()))
         return super().do_GET()
     def do_POST(self):
+        if self.path == "/api/reset":
+            COMPLETED_JOBS.clear()
+            RESOLVED_ALERTS.clear()
+            result = advanced_optimize(load_scenario("baseline"))
+            result["reset"] = True
+            return self.reply(result)
         if self.path == "/api/complete":
             try:
                 incoming=json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
                 job_id=incoming.get("job_id")
                 if not job_id: return self.reply({"error":"job_id is required"},400)
                 COMPLETED_JOBS.add(job_id)
+                scenario_name = incoming.get("scenario_name", "baseline")
                 alert_map={"CMR001":"ALERT001", "CMR003":"ALERT002", "ALERT001":"ALERT001", "ALERT002":"ALERT002"}
                 if job_id in alert_map: RESOLVED_ALERTS.add(alert_map[job_id])
-                result=advanced_optimize(apply_completion_state(load_scenario()))
-                result["completion"]={"job_id":job_id,"status":"completed","resolved_alert_id":alert_map.get(job_id)}
+                result=advanced_optimize(apply_completion_state(load_scenario(scenario_name)))
+                result["completion"]={"job_id":job_id,"status":"completed","resolved_alert_id":alert_map.get(job_id),"scenario_name":scenario_name}
                 return self.reply(result)
             except Exception as e: return self.reply({"error":str(e)},400)
         if self.path!="/api/optimize": return self.reply({"error":"Not found"},404)
